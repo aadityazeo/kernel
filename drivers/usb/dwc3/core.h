@@ -219,6 +219,7 @@
 #define DWC3_GUSB3PIPECTL_U2SSINP3OK	(1 << 29)
 #define DWC3_GUSB3PIPECTL_UX_EXIT_IN_PX	(1 << 27)
 #define DWC3_GUSB3PIPECTL_REQP1P2P3	(1 << 24)
+#define DWC3_GUSB3PIPECTL_DISRXDETU3	(1 << 22)
 #define DWC3_GUSB3PIPECTL_DEP1P2P3(n)	((n) << 19)
 #define DWC3_GUSB3PIPECTL_DEP1P2P3_MASK	DWC3_GUSB3PIPECTL_DEP1P2P3(7)
 #define DWC3_GUSB3PIPECTL_DEP1P2P3_EN	DWC3_GUSB3PIPECTL_DEP1P2P3(1)
@@ -846,6 +847,7 @@ struct dwc3_scratchpad_array {
  * @bh: tasklet which handles the interrupt
  * @irq_cnt: total irq count
  * @last_irq_cnt: last irq count
+ * @err_cnt: total error count
  * @bh_completion_time: time taken for taklet completion
  * @bh_handled_evt_cnt: no. of events handled by tasklet per interrupt
  * @bh_dbg_index: index for capturing bh_completion_time and bh_handled_evt_cnt
@@ -1037,6 +1039,7 @@ struct dwc3 {
 	int			irq;
 	unsigned long		irq_cnt;
 	unsigned long		last_irq_cnt;
+	unsigned long		err_cnt;
 	unsigned long		ep_cmd_timeout_cnt;
 	unsigned                bh_completion_time[MAX_INTR_STATS];
 	unsigned                bh_handled_evt_cnt[MAX_INTR_STATS];
