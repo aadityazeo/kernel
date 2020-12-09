@@ -1,4 +1,3 @@
-
 /*
  * Universal Flash Storage Host controller driver Core
  *
