@@ -1005,7 +1005,6 @@ static int p54u_probe(struct usb_interface *intf,
 	skb_queue_head_init(&priv->rx_queue);
 	init_usb_anchor(&priv->submitted);
 
-
 	/* really lazy and simple way of figuring out if we're a 3887 */
 	/* TODO: should just stick the identification in the device table */
 	i = intf->altsetting->desc.bNumEndpoints;
@@ -1048,7 +1047,6 @@ static int p54u_probe(struct usb_interface *intf,
 	err = p54u_load_firmware(dev, intf);
 	if (err)
 		p54_free_common(dev);
-
 	return err;
 }
 
