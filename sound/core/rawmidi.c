@@ -1436,7 +1436,6 @@ static unsigned int snd_rawmidi_poll(struct file *file, poll_table * wait)
 #endif
 
 /*
-
  */
 
 static void snd_rawmidi_proc_info_read(struct snd_info_entry *entry,

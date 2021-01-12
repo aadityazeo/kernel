@@ -1,3 +1,4 @@
+
 /*
  *  linux/drivers/mmc/host/sdhci.c - Secure Digital Host Controller Interface driver
  *
@@ -111,19 +112,6 @@ static void sdhci_dump_state(struct sdhci_host *host)
 
 static void sdhci_dumpregs(struct sdhci_host *host)
 {
-	if((host->mmc)&&(host->mmc->card)){
-		if (mmc_card_mmc(host->mmc->card)) {
-			if (host->mmc->card->ext_csd.rev < 7) {
-				 pr_info(DRIVER_NAME " mid %x\n", host->mmc->card->cid.manfid);
-				 pr_info(DRIVER_NAME " FW 0x%x\n", host->mmc->card->cid.fwrev);
-			} else {
-				pr_info(DRIVER_NAME " mid 0x%x\n", host->mmc->card->cid.manfid);
-				pr_info(DRIVER_NAME " FW 0x%*phN\n", MMC_FIRMWARE_LEN,
-					host->mmc->card->ext_csd.fwrev);
-			}
-		}
-	}
-
 	MMC_TRACE(host->mmc,
 		"%s: 0x04=0x%08x 0x06=0x%08x 0x0E=0x%08x 0x30=0x%08x 0x34=0x%08x 0x38=0x%08x\n",
 		__func__,
@@ -198,11 +186,6 @@ static void sdhci_dumpregs(struct sdhci_host *host)
 		host->ops->dump_vendor_regs(host);
 	sdhci_dump_state(host);
 	pr_info(DRIVER_NAME ": ===========================================\n");
-
-#ifdef CONFIG_SDHCI_DUMPREG_DEBUG_PANIC
-	if (mmc_card_mmc(host->mmc->card))
-		BUG_ON(true);
-#endif
 }
 
 /*****************************************************************************\
@@ -1754,13 +1737,9 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	sdhci_runtime_pm_get(host);
 	if (sdhci_check_state(host)) {
-		if (sdhci_do_get_cd(host)) {
-			sdhci_dump_state(host);
-			pr_err("%s: sdhci in bad state\n",
-				mmc_hostname(host->mmc));
-		} else
-			pr_warn("%s(%s): card removed\n",
-				__func__, mmc_hostname(mmc));
+		sdhci_dump_state(host);
+		pr_err("%s: sdhci in bad state\n",
+			mmc_hostname(host->mmc));
 		mrq->cmd->error = -EIO;
 		if (mrq->data)
 			mrq->data->error = -EIO;
