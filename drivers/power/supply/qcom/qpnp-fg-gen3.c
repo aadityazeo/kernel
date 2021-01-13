@@ -4251,7 +4251,7 @@ static int fg_bcl_reset(struct fg_chip *chip)
 			rc = fg_dma_mem_req(chip, false);
 			if (rc < 0)
 				pr_err("Error in unlocking memory, rc=%d\n",
-					 rc);
+						rc);
 
 			/* Delay of 2ms */
 			usleep_range(2000, 3000);
@@ -4268,8 +4268,8 @@ static int fg_bcl_reset(struct fg_chip *chip)
 			rc = fg_dma_mem_req(chip, false);
 			if (rc < 0) {
 				pr_err("Error in unlocking memory, rc=%d\n",
-					 rc);
-				return rc;
+						rc);
+				goto unlock;
 			}
 			success = false;
 			pr_err_ratelimited("PEEK_MUX1 not set retrying...\n");
