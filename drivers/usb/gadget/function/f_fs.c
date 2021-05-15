@@ -1,3 +1,4 @@
+
 /*
  * f_fs.c -- user mode file system API for USB composite function controllers
  *
@@ -912,13 +913,13 @@ retry:
 	if (epfile->ep != ep) {
 		/* In the meantime, endpoint got disabled or changed. */
 		ret = -ESHUTDOWN;
-		spin_unlock_irq(&epfile->ffs->eps_lock);
+		goto error_lock;
 	} else if (halt) {
 		/* Halt */
 		if (likely(epfile->ep == ep) && !WARN_ON(!ep->ep))
 			usb_ep_set_halt(ep->ep);
-		spin_unlock_irq(&epfile->ffs->eps_lock);
 		ret = -EBADMSG;
+		goto error_lock;
 	} else {
 		/* Fire the request */
 		struct usb_request *req;
@@ -942,8 +943,10 @@ retry:
 
 		if (io_data->aio) {
 			req = usb_ep_alloc_request(ep->ep, GFP_ATOMIC);
-			if (unlikely(!req))
+			if (unlikely(!req)) {
+				ret = -ENOMEM;
 				goto error_lock;
+			}
 
 			req->buf      = data;
 			req->length   = data_len;
@@ -2528,11 +2531,20 @@ static int __ffs_data_do_os_desc(enum ffs_os_desc_type type,
 		int i;
 
 		if (len < sizeof(*d) ||
-		    d->bFirstInterfaceNumber >= ffs->interfaces_count ||
-		    d->Reserved1 != 1) {
+		    d->bFirstInterfaceNumber >= ffs->interfaces_count) {
 			pr_err("%s(): Invalid os_desct_ext_compat\n",
 							__func__);
 			return -EINVAL;
+		}
+		if (d->Reserved1 != 1) {
+			/*
+			 * According to the spec, Reserved1 must be set to 1
+			 * but older kernels incorrectly rejected non-zero
+			 * values.  We fix it here to avoid returning EINVAL
+			 * in response to values we used to accept.
+			 */
+			pr_debug("usb_ext_compat_desc::Reserved1 forced to 1\n");
+			d->Reserved1 = 1;
 		}
 		for (i = 0; i < ARRAY_SIZE(d->Reserved2); ++i)
 			if (d->Reserved2[i]) {
@@ -4123,6 +4135,11 @@ static void _ffs_free_dev(struct ffs_dev *dev)
 	list_del(&dev->entry);
 	if (dev->name_allocated)
 		kfree(dev->name);
+
+	/* Clear the private_data pointer to stop incorrect dev access */
+	if (dev->ffs_data)
+		dev->ffs_data->private_data = NULL;
+
 	kfree(dev);
 	if (list_empty(&ffs_devices))
 		functionfs_cleanup();
@@ -4239,6 +4256,7 @@ static void ffs_closed(struct ffs_data *ffs)
 	}
 
 	ffs_obj->desc_ready = false;
+	ffs_obj->ffs_data = NULL;
 
 	if (test_and_clear_bit(FFS_FL_CALL_CLOSED_CALLBACK, &ffs->flags) &&
 	    ffs_obj->ffs_closed_callback)

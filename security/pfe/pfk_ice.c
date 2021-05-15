@@ -64,6 +64,36 @@
 uint8_t ice_key[ICE_KEY_SIZE];
 uint8_t ice_salt[ICE_KEY_SIZE];
 
+static void qti_pfk_ice_stat_failure(char *type, uint32_t id, int32_t err)
+{
+	static uint32_t set_key_failure = 0, invalidate_key_failure = 0;
+	static uint32_t set_key_cont_failure = 0, invalidate_key_cont_failure = 0;
+
+	if (err == 0) {
+		set_key_cont_failure = 0;
+		invalidate_key_cont_failure = 0;
+		return;
+	}
+
+	if (id == TZ_ES_SET_ICE_KEY_ID) {
+		set_key_failure++;
+		set_key_cont_failure++;
+	} else if (id == TZ_ES_INVALIDATE_ICE_KEY_ID) {
+		invalidate_key_failure++;
+		invalidate_key_cont_failure++;
+	} else {
+		pr_warn("%s: unsupported id %d\n", __func__, id);
+		return;
+	}
+
+	pr_warn("%s: failed to call scm %d (%d %d %d %d)\n",
+		__func__, id, set_key_failure, invalidate_key_failure,
+		set_key_cont_failure, invalidate_key_failure);
+	if (err != -EBUSY)
+		BUG();
+	BUG_ON((invalidate_key_cont_failure + set_key_cont_failure) > 30000);
+}
+
 int qti_pfk_ice_set_key(uint32_t index, uint8_t *key, uint8_t *salt,
 			char *storage_type)
 {
@@ -126,6 +156,7 @@ int qti_pfk_ice_set_key(uint32_t index, uint8_t *key, uint8_t *salt,
 
 	pr_debug(" %s , ret = %d\n", __func__, ret);
 
+	qti_pfk_ice_stat_failure(s_type, smc_id, ret);
 	if (ret) {
 		pr_err("%s: Set key Error: %d\n", __func__, ret);
 		if (ret == -EBUSY) {
@@ -180,6 +211,7 @@ int qti_pfk_ice_invalidate_key(uint32_t index, char *storage_type)
 
 	ret = scm_call2(smc_id, &desc);
 
+	qti_pfk_ice_stat_failure(storage_type, smc_id, ret);
 	if (ret) {
 		pr_err("%s: Error: 0x%x\n", __func__, ret);
 		if (qcom_ice_setup_ice_hw((const char *)storage_type, false))

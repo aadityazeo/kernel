@@ -450,10 +450,12 @@ static unsigned long msm_cpp_queue_buffer_info(struct cpp_device *cpp_dev,
 	buff->map_info.buff_info = *buffer_info;
 	buff->map_info.buf_fd = buffer_info->fd;
 
+#if defined(CONFIG_TRACING) && defined(DEBUG)
 	trace_printk("fd %d index %d native_buff %d ssid %d %d\n",
 		buffer_info->fd, buffer_info->index,
 		buffer_info->native_buff, buff_queue->session_id,
 		buff_queue->stream_id);
+#endif
 
 	if (buff_queue->security_mode == SECURE_MODE)
 		rc = cam_smmu_get_stage2_phy_addr(cpp_dev->iommu_hdl,
@@ -485,10 +487,12 @@ static void msm_cpp_dequeue_buffer_info(struct cpp_device *cpp_dev,
 {
 	int ret = -1;
 
+#if defined(CONFIG_TRACING) && defined(DEBUG)
 	trace_printk("fd %d index %d native_buf %d ssid %d %d\n",
 		buff->map_info.buf_fd, buff->map_info.buff_info.index,
 		buff->map_info.buff_info.native_buff, buff_queue->session_id,
 		buff_queue->stream_id);
+#endif
 
 	if (buff_queue->security_mode == SECURE_MODE)
 		ret = cam_smmu_put_stage2_phy_addr(cpp_dev->iommu_hdl,
@@ -1578,7 +1582,6 @@ static int cpp_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x88));
 		pr_debug("DEBUG_R1: 0x%x\n",
 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x8C));
-
 		msm_camera_io_w(0x0, cpp_dev->base + MSM_CPP_MICRO_CLKEN_CTL);
 		msm_cpp_clear_timer(cpp_dev);
 		cpp_release_hardware(cpp_dev);

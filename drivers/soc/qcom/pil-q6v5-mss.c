@@ -36,7 +36,8 @@
 #include "peripheral-loader.h"
 #include "pil-q6v5.h"
 #include "pil-msa.h"
-
+#include "mmi-unit-info.h"
+#include <soc/qcom/bootinfo.h>
 #define MAX_VDD_MSS_UV		1150000
 #define PROXY_TIMEOUT_MS	10000
 #define MAX_SSR_REASON_LEN	130U
@@ -44,11 +45,21 @@
 
 #define subsys_to_drv(d) container_of(d, struct modem_data, subsys_desc)
 
+static char pil_ssr_reason[MAX_SSR_REASON_LEN];
+static char *ssr_reason = pil_ssr_reason;
+module_param(ssr_reason, charp, S_IRUGO);
+
+#define FULLDUMP_MSS_PANIC_LIST_LEN 91
+#define DELIMS                      ":"
+static char fulldump_mss_panic[FULLDUMP_MSS_PANIC_LIST_LEN];
+static char *fdump_mpanic = fulldump_mss_panic;
+module_param(fdump_mpanic, charp, S_IRUSR | S_IWUSR);
+
 static void log_modem_sfr(void)
 {
 	u32 size;
-	char *smem_reason, reason[MAX_SSR_REASON_LEN];
-
+	char *smem_reason;
+        mmi_set_pureason(PU_REASON_MODEM_RESET);
 	smem_reason = smem_get_entry_no_rlock(SMEM_SSR_REASON_MSS0, &size, 0,
 							SMEM_ANY_HOST_FLAG);
 	if (!smem_reason || !size) {
@@ -60,8 +71,8 @@ static void log_modem_sfr(void)
 		return;
 	}
 
-	strlcpy(reason, smem_reason, min(size, MAX_SSR_REASON_LEN));
-	pr_err("modem subsystem failure reason: %s.\n", reason);
+	strlcpy(pil_ssr_reason, smem_reason, min((size_t)size, sizeof(pil_ssr_reason)));
+	pr_err("modem subsystem failure reason: %s.\n", pil_ssr_reason);
 
 	smem_reason[0] = '\0';
 	wmb();
@@ -69,8 +80,28 @@ static void log_modem_sfr(void)
 
 static void restart_modem(struct modem_data *drv)
 {
+	char ssr_reason[MAX_SSR_REASON_LEN];
+	char *reason_str = ssr_reason;
+	char *fname;
+
 	log_modem_sfr();
 	drv->ignore_errors = true;
+
+	/* check if any modem panic is specified for full dump */
+	if (fdump_mpanic != NULL && strlen(fdump_mpanic) > 0 &&
+	    strlen(fdump_mpanic) < FULLDUMP_MSS_PANIC_LIST_LEN) {
+		strscpy(ssr_reason, pil_ssr_reason, sizeof(ssr_reason));
+		fname = strsep(&reason_str, DELIMS);
+		pr_info("fulldump_on_specified_modem_panic %s, current panic %s\n",
+			fdump_mpanic, fname);
+		if (fname != NULL &&
+		   strnstr(fdump_mpanic, fname, strlen(fdump_mpanic)) != NULL) {
+			/* force kernel panic as the specified panic is hit */
+			panic("Force kernel panic for this specific modem panic\n");
+			return;
+		}
+	}
+
 	subsystem_restart_dev(drv->subsys);
 }
 

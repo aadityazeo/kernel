@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2018, 2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -235,9 +235,6 @@ enum {
 	IDX_AFE_PORT_ID_QUATERNARY_MI2S_TX_2,
 	IDX_AFE_PORT_ID_QUATERNARY_MI2S_TX_3,
 	IDX_AFE_PORT_ID_QUATERNARY_MI2S_TX_4,
-	/* IDX 167 -> 168 */
-	IDX_RT_PROXY_PORT_002_RX,
-	IDX_RT_PROXY_PORT_002_TX,
 	AFE_MAX_PORTS
 };
 
@@ -531,4 +528,21 @@ int afe_i2s_port_start(u16 port_id, struct afe_i2s_port_config *i2s_port,
 int afe_port_group_mi2s_enable(u16 group_id,
 		union afe_port_group_mi2s_config *afe_group_config,
 		u16 enable);
+
+#ifdef CONFIG_SND_SOC_OPALUM
+int ospl2xx_afe_set_callback(int32_t (*ospl2xx_callback_func)
+				(struct apr_client_data *data));
+int afe_set_ospl2xx_params(u16 port_id, struct param_hdr_v3 param_hdr,
+				u8 *param_data);
+int afe_get_ospl2xx_params(u16 port_id, struct mem_mapping_hdr *mem_hdr,
+				struct param_hdr_v3 *param_hdr);
+#endif
+#ifdef CONFIG_SND_SOC_TAS2560
+int tas2560_algo_afe_set_callback(int32_t (*tas2560_algo_callback_func)
+				(struct apr_client_data *data));
+int afe_set_tas25xx_params(u16 port_id, struct param_hdr_v3 param_hdr,
+				u8 *param_data);
+int afe_get_tas25xx_params(u16 port_id, struct mem_mapping_hdr *mem_hdr,
+				struct param_hdr_v3 *param_hdr);
+#endif
 #endif /* __Q6AFE_V2_H__ */

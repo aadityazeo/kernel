@@ -1659,6 +1659,7 @@ typedef int (*filldir_t)(struct dir_context *, const char *, int, loff_t, u64,
 struct dir_context {
 	const filldir_t actor;
 	loff_t pos;
+	bool romnt;
 };
 
 struct block_device_operations;
@@ -1797,6 +1798,7 @@ struct super_operations {
 	void *(*clone_mnt_data) (void *);
 	void (*copy_mnt_data) (void *, void *);
 	void (*umount_begin) (struct super_block *);
+	void (*umount_end) (struct super_block *, int);
 
 	int (*show_options)(struct seq_file *, struct dentry *);
 	int (*show_options2)(struct vfsmount *,struct seq_file *, struct dentry *);
@@ -1837,6 +1839,7 @@ struct super_operations {
 #define S_DAX		0	/* Make all the DAX code disappear */
 #endif
 #define S_ENCRYPTED	16384	/* Encrypted file (using fs/crypto/) */
+#define S_RELATIME	(1 << 31)	/* Update relative access times */
 
 /*
  * Note that nosuid etc flags are inode-specific: setting some file-system

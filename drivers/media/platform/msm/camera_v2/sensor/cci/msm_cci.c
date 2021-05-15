@@ -32,7 +32,7 @@
 #define CYCLES_PER_MICRO_SEC_DEFAULT 4915
 #define CCI_MAX_DELAY 1000000
 
-#define CCI_TIMEOUT msecs_to_jiffies(100)
+#define CCI_TIMEOUT msecs_to_jiffies(1000)
 
 /* TODO move this somewhere else */
 #define MSM_CCI_DRV_NAME "msm_cci"
@@ -845,7 +845,7 @@ static int32_t msm_cci_i2c_read(struct v4l2_subdev *sd,
 	if (rc < 0) {
 		pr_err("%s:%d msm_cci_set_clk_param failed rc = %d\n",
 			__func__, __LINE__, rc);
-		return rc;
+		goto ERROR;
 	}
 
 	/*
@@ -1426,9 +1426,13 @@ static int32_t msm_cci_init(struct v4l2_subdev *sd,
 	}
 
 	/* Re-initialize the completion */
-	reinit_completion(&cci_dev->cci_master_info[master].reset_complete);
+	reinit_completion(&cci_dev->cci_master_info[MASTER_0].reset_complete);
 	for (i = 0; i < NUM_QUEUES; i++)
-		reinit_completion(&cci_dev->cci_master_info[master].
+		reinit_completion(&cci_dev->cci_master_info[MASTER_0].
+			report_q[i]);
+	reinit_completion(&cci_dev->cci_master_info[MASTER_1].reset_complete);
+	for (i = 0; i < NUM_QUEUES; i++)
+		reinit_completion(&cci_dev->cci_master_info[MASTER_1].
 			report_q[i]);
 	rc = msm_camera_enable_irq(cci_dev->irq, true);
 	if (rc < 0)

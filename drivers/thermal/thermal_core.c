@@ -52,6 +52,8 @@ MODULE_AUTHOR("Zhang Rui");
 MODULE_DESCRIPTION("Generic thermal management sysfs support");
 MODULE_LICENSE("GPL v2");
 
+#define THERMAL_MAX_ACTIVE	16
+
 static DEFINE_IDR(thermal_tz_idr);
 static DEFINE_IDR(thermal_cdev_idr);
 static DEFINE_MUTEX(thermal_idr_lock);
@@ -64,6 +66,8 @@ static DEFINE_MUTEX(thermal_list_lock);
 static DEFINE_MUTEX(thermal_governor_lock);
 
 static struct thermal_governor *def_governor;
+
+static struct workqueue_struct *thermal_passive_wq;
 
 static struct thermal_governor *__find_governor(const char *name)
 {
@@ -381,15 +385,29 @@ static __ref int sensor_sysfs_notify(void *data)
 	int ret = 0;
 	struct sensor_info *sensor = (struct sensor_info *)data;
 
+	set_current_state(TASK_INTERRUPTIBLE);
 	while (!kthread_should_stop()) {
-		if (wait_for_completion_interruptible(
-			&sensor->sysfs_notify_complete) != 0)
+		if (wait_event_interruptible(
+		   sensor->sysfs_notify_complete.wait,
+		   sensor->sysfs_notify_complete.done || kthread_should_stop()))
 			continue;
-		if (sensor->deregister_active)
-			return ret;
+
+		if (kthread_should_stop())
+			break;
+
+		set_current_state(TASK_RUNNING);
+		/*  Wait the kthread_should_stop to exit,
+		 *  avoid the crash from double free thread or sensor freed.
+		*/
+		if (sensor->deregister_active) {
+			set_current_state(TASK_INTERRUPTIBLE);
+			continue;
+		}
+
 		reinit_completion(&sensor->sysfs_notify_complete);
 		sysfs_notify(&sensor->tz->device.kobj, NULL,
 					THERMAL_UEVENT_DATA);
+		set_current_state(TASK_INTERRUPTIBLE);
 	}
 	return ret;
 }
@@ -794,14 +812,15 @@ exit:
 	mutex_unlock(&thermal_list_lock);
 }
 
-static void thermal_zone_device_set_polling(struct thermal_zone_device *tz,
+static void thermal_zone_device_set_polling(struct workqueue_struct *queue,
+					    struct thermal_zone_device *tz,
 					    int delay)
 {
 	if (delay > 1000)
-		mod_delayed_work(system_freezable_wq, &tz->poll_queue,
+		mod_delayed_work(queue, &tz->poll_queue,
 				 round_jiffies(msecs_to_jiffies(delay)));
 	else if (delay)
-		mod_delayed_work(system_freezable_wq, &tz->poll_queue,
+		mod_delayed_work(queue, &tz->poll_queue,
 				 msecs_to_jiffies(delay));
 	else
 		cancel_delayed_work(&tz->poll_queue);
@@ -812,11 +831,14 @@ static void monitor_thermal_zone(struct thermal_zone_device *tz)
 	mutex_lock(&tz->lock);
 
 	if (tz->passive)
-		thermal_zone_device_set_polling(tz, tz->passive_delay);
+		thermal_zone_device_set_polling(thermal_passive_wq,
+						tz, tz->passive_delay);
 	else if (tz->polling_delay)
-		thermal_zone_device_set_polling(tz, tz->polling_delay);
+		thermal_zone_device_set_polling(
+				system_freezable_power_efficient_wq,
+				tz, tz->polling_delay);
 	else
-		thermal_zone_device_set_polling(tz, 0);
+		thermal_zone_device_set_polling(NULL, tz, 0);
 
 	mutex_unlock(&tz->lock);
 }
@@ -2397,7 +2419,7 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
 	/* Bind cooling devices for this zone */
 	bind_tz(tz);
 
-	INIT_DELAYED_WORK(&(tz->poll_queue), thermal_zone_device_check);
+	INIT_DEFERRABLE_WORK(&(tz->poll_queue), thermal_zone_device_check);
 
 	thermal_zone_device_reset(tz);
 	/* Update the new thermal zone and mark it as already updated. */
@@ -2653,9 +2675,18 @@ static int __init thermal_init(void)
 {
 	int result;
 
+	thermal_passive_wq = alloc_workqueue("thermal_passive_wq",
+						WQ_HIGHPRI | WQ_UNBOUND
+						| WQ_FREEZABLE,
+						THERMAL_MAX_ACTIVE);
+	if (!thermal_passive_wq) {
+		result = -ENOMEM;
+		goto error;
+	}
+
 	result = thermal_register_governors();
 	if (result)
-		goto error;
+		goto destroy_wq;
 
 	result = class_register(&thermal_class);
 	if (result)
@@ -2677,6 +2708,8 @@ unregister_class:
 	class_unregister(&thermal_class);
 unregister_governors:
 	thermal_unregister_governors();
+destroy_wq:
+	destroy_workqueue(thermal_passive_wq);
 error:
 	idr_destroy(&thermal_tz_idr);
 	idr_destroy(&thermal_cdev_idr);
@@ -2689,6 +2722,7 @@ error:
 static void __exit thermal_exit(void)
 {
 	of_thermal_destroy_zones();
+	destroy_workqueue(thermal_passive_wq);
 	genetlink_exit();
 	class_unregister(&thermal_class);
 	thermal_unregister_governors();

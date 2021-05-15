@@ -3416,8 +3416,7 @@ static int pp_ad_calc_bl(struct msm_fb_data_type *mfd, int bl_in, int *bl_out,
 		return -EPERM;
 	}
 
-	if (!ad->bl_mfd || !ad->bl_mfd->panel_info ||
-		ad->bl_att_lut == NULL) {
+	if (!ad->bl_mfd || !ad->bl_mfd->panel_info) {
 		pr_err("Invalid ad info: bl_mfd = 0x%pK, ad->bl_mfd->panel_info = 0x%pK, bl_att_lut = 0x%pK\n",
 			ad->bl_mfd,
 			(!ad->bl_mfd) ? NULL : ad->bl_mfd->panel_info,
@@ -4129,7 +4128,8 @@ int mdss_mdp_igc_lut_config(struct msm_fb_data_type *mfd,
 		if (config->len != IGC_LUT_ENTRIES) {
 			pr_err("invalid len for IGC table for read %d\n",
 			       config->len);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto igc_config_exit;
 		}
 		ret = pp_get_dspp_num(disp_num, &dspp_num);
 		if (ret) {
@@ -4195,7 +4195,8 @@ clock_off:
 		if (config->len != IGC_LUT_ENTRIES) {
 			pr_err("invalid len for IGC table for write %d\n",
 			       config->len);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto igc_config_exit;
 		}
 		if (copy_from_kernel) {
 			memcpy(&mdss_pp_res->igc_lut_c0c1[disp_num][0],

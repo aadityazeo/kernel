@@ -1079,6 +1079,7 @@ void msm_isp_notify(struct vfe_device *vfe_dev, uint32_t event_type,
 			vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id,
 			0, 0);
 
+
 		/*
 		 * Cannot support dual_cam and framedrop same time in union.
 		 * If need to support framedrop as well, move delta calculation
